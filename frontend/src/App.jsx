@@ -1,22 +1,23 @@
 import React, { useState } from 'react'
 import { TrendingUp, Activity, DollarSign, AlertTriangle } from 'lucide-react'
 import Header from './components/Header'
-import PositionsTable from './components/PositionsTable'
-import LivePNLChart from './components/LivePNLChart'
-import StrategyCard from './components/StrategyCard'
+import Navigation from './components/Navigation'
+import PositionsView from './components/PositionsView'
+import HoldingsView from './components/HoldingsView'
+import StrategyView from './components/StrategyView'
 import MetricsCard from './components/MetricsCard'
 import RiskAlerts from './components/RiskAlerts'
 import { usePositions } from './hooks/usePositions'
 import { usePNL } from './hooks/usePNL'
 
 function App() {
+  const [activeView, setActiveView] = useState('positions') // 'holdings', 'positions', 'strategy'
   const { positions, loading: positionsLoading, error: positionsError } = usePositions()
   const { pnlData, summary, loading: pnlLoading } = usePNL()
-  const [showStrategyModal, setShowStrategyModal] = useState(false)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <Header onExecuteStrategy={() => setShowStrategyModal(true)} />
+      <Header />
       
       <main className="container mx-auto px-4 py-6 space-y-6">
         {/* Metrics Overview */}
@@ -51,26 +52,21 @@ function App() {
         {/* Risk Alerts */}
         <RiskAlerts />
 
-        {/* Live P&L Chart */}
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-xl p-6 border border-slate-700">
-          <h2 className="text-xl font-bold mb-4 text-slate-100">Live P&L Tracker</h2>
-          <LivePNLChart data={pnlData} loading={pnlLoading} />
-        </div>
+        {/* Navigation Menu */}
+        <Navigation activeView={activeView} setActiveView={setActiveView} />
 
-        {/* Positions Table */}
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl shadow-xl p-6 border border-slate-700">
-          <h2 className="text-xl font-bold mb-4 text-slate-100">Active Positions</h2>
-          <PositionsTable 
-            positions={positions} 
-            loading={positionsLoading} 
-            error={positionsError} 
+        {/* Conditional Views Based on Active Tab */}
+        {activeView === 'holdings' && <HoldingsView />}
+        {activeView === 'positions' && (
+          <PositionsView 
+            positions={positions}
+            loading={positionsLoading}
+            error={positionsError}
+            pnlData={pnlData}
+            pnlLoading={pnlLoading}
           />
-        </div>
-
-        {/* Strategy Execution Modal */}
-        {showStrategyModal && (
-          <StrategyCard onClose={() => setShowStrategyModal(false)} />
         )}
+        {activeView === 'strategy' && <StrategyView />}
       </main>
     </div>
   )
