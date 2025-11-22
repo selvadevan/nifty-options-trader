@@ -1,132 +1,108 @@
-import requests
-from typing import Dict, List, Optional
+import sys
+import os
+# Add project root to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
+from auto_login import auto_login, load_access_token
+from kiteconnect import KiteConnect
 import logging
 
 logger = logging.getLogger(__name__)
 
 class BrokerService:
-    """Unified broker interface for Indian brokers"""
-    
-    def __init__(self, api_key: str, api_secret: str, broker: str = 'zerodha'):
-        self.api_key = api_key
-        self.api_secret = api_secret
+    """Unified broker interface with auto-authentication"""
+
+    def __init__(self, api_key: str = None, api_secret: str = None, broker: str = 'zerodha'):
         self.broker = broker
+        self.api_key = api_key or os.getenv('API_KEY')
+        self.api_secret = api_secret or os.getenv('API_SECRET')
+        self.kite = None
         self.access_token = None
-        self.base_url = self._get_base_url()
-        
-    def _get_base_url(self) -> str:
-        """Get broker-specific base URL"""
-        urls = {
-            'zerodha': 'https://api.kite.trade',
-            'angelone': 'https://apiconnect.angelbroking.com',
-            'upstox': 'https://api.upstox.com/v2',
-            'kotak': 'https://gw-napi.kotaksecurities.com'
-        }
-        return urls.get(self.broker, '')
-    
-    def login(self, request_token: str = None) -> bool:
-        """Authenticate with broker API"""
+        self._authenticate()
+
+    def _authenticate(self):
+        """Authenticate using auto-login"""
         try:
-            # Implementation varies by broker
-            # Example for Zerodha
-            if self.broker == 'zerodha':
-                from kiteconnect import KiteConnect
-                kite = KiteConnect(api_key=self.api_key)
-                data = kite.generate_session(request_token, 
-                                            api_secret=self.api_secret)
-                self.access_token = data['access_token']
-                return True
+            # Try to load today's saved token first
+            self.access_token = load_access_token()
+
+            # If no valid token, do auto-login
+            if not self.access_token:
+                logger.info("No valid token found, attempting auto-login...")
+                self.access_token = auto_login()
+
+            if self.access_token:
+                # Create authenticated Kite instance
+                self.kite = KiteConnect(api_key=self.api_key)
+                self.kite.set_access_token(self.access_token)
+                logger.info("✅ Kite authenticated successfully")
+            else:
+                logger.error("❌ Authentication failed")
+
         except Exception as e:
-            logger.error(f"Login failed: {e}")
-            return False
-    
-    def get_quote(self, symbol: str, exchange: str = 'NFO') -> Optional[Dict]:
-        """Get real-time quote for options"""
+            logger.error(f"Authentication error: {e}")
+
+    def get_quote(self, symbol: str, exchange: str = 'NFO'):
+        """Get real-time quote"""
         try:
-            headers = {
-                'Authorization': f'token {self.api_key}:{self.access_token}',
-                'X-Kite-Version': '3'
-            }
-            
-            url = f"{self.base_url}/quote"
-            params = {'i': f'{exchange}:{symbol}'}
-            
-            response = requests.get(url, headers=headers, params=params)
-            response.raise_for_status()
-            
-            return response.json()['data'][f'{exchange}:{symbol}']
-            
+            if not self.kite:
+                raise Exception("Not authenticated")
+
+            instruments = self.kite.quote([f'{exchange}:{symbol}'])
+            return instruments.get(f'{exchange}:{symbol}')
+
         except Exception as e:
             logger.error(f"Quote fetch failed: {e}")
             return None
-    
-    def place_order(self, 
-                   symbol: str,
-                   transaction_type: str,  # BUY or SELL
-                   quantity: int,
-                   price: float = None,
-                   order_type: str = 'LIMIT',
-                   product: str = 'NRML') -> Optional[str]:
-        """Place option order"""
+
+    def place_order(self, symbol: str, transaction_type: str, quantity: int,
+                   price: float = None, order_type: str = 'LIMIT', product: str = 'NRML'):
+        """Place order"""
         try:
-            headers = {
-                'Authorization': f'token {self.api_key}:{self.access_token}',
-                'Content-Type': 'application/json'
-            }
-            
-            order_data = {
-                'tradingsymbol': symbol,
-                'exchange': 'NFO',
-                'transaction_type': transaction_type,
-                'order_type': order_type,
-                'quantity': quantity,
-                'product': product,
-                'validity': 'DAY'
-            }
-            
-            if price and order_type == 'LIMIT':
-                order_data['price'] = price
-            
-            url = f"{self.base_url}/orders"
-            response = requests.post(url, json=order_data, headers=headers)
-            response.raise_for_status()
-            
-            return response.json()['data']['order_id']
-            
+            if not self.kite:
+                raise Exception("Not authenticated")
+
+            order_id = self.kite.place_order(
+                variety=self.kite.VARIETY_REGULAR,
+                exchange=self.kite.EXCHANGE_NFO,
+                tradingsymbol=symbol,
+                transaction_type=transaction_type,
+                quantity=quantity,
+                product=product,
+                order_type=order_type,
+                price=price
+            )
+            return order_id
+
         except Exception as e:
             logger.error(f"Order placement failed: {e}")
             return None
-    
-    def get_positions(self) -> List[Dict]:
+
+    def get_positions(self):
         """Get current positions"""
         try:
-            headers = {
-                'Authorization': f'token {self.api_key}:{self.access_token}'
-            }
-            
-            url = f"{self.base_url}/portfolio/positions"
-            response = requests.get(url, headers=headers)
-            response.raise_for_status()
-            
-            return response.json()['data']['net']
-            
+            if not self.kite:
+                raise Exception("Not authenticated")
+
+            positions = self.kite.positions()
+            return positions['net']
+
         except Exception as e:
             logger.error(f"Position fetch failed: {e}")
             return []
-    
     def get_holdings(self) -> List[Dict]:
         """Get all holdings"""
         try:
             headers = {
                 'Authorization': f'token {self.api_key}:{self.access_token}'
             }
-            
+
             url = f"{self.base_url}/portfolio/holdings"
             response = requests.get(url, headers=headers)
             response.raise_for_status()
-            
+
             return response.json()['data']
-            
+
         except Exception as e:
             logger.error(f"Holdings fetch failed: {e}")
             return []
