@@ -57,6 +57,24 @@ def get_positions():
         'data': positions
     })
 
+@orders_bp.route('/holdings', methods=['GET'])
+def get_holdings():
+    """Get all holdings"""
+    try:
+        broker = BrokerService(config.BROKER_API_KEY, config.BROKER_API_SECRET)
+        holdings = broker.get_holdings()
+        
+        return jsonify({
+            'success': True,
+            'data': holdings
+        })
+    except Exception as e:
+        logger.error(f"Holdings fetch failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @orders_bp.route('/strategy/execute', methods=['POST'])
 def execute_strategy():
     """Execute the put selling strategy"""

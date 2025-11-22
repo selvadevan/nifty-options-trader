@@ -1,7 +1,7 @@
 import React from 'react'
-import { TrendingUp, Play, RefreshCw } from 'lucide-react'
+import { TrendingUp, RefreshCw } from 'lucide-react'
 
-const Header = ({ onExecuteStrategy }) => {
+const Header = () => {
   return (
     <header className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-700 sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
@@ -17,14 +17,6 @@ const Header = ({ onExecuteStrategy }) => {
           </div>
           
           <div className="flex items-center space-x-3">
-            <button
-              onClick={onExecuteStrategy}
-              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-            >
-              <Play className="w-4 h-4" />
-              <span>Execute Strategy</span>
-            </button>
-            
             <button
               onClick={() => window.location.reload()}
               className="flex items-center space-x-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors"

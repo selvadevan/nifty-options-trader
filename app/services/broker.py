@@ -113,3 +113,20 @@ class BrokerService:
         except Exception as e:
             logger.error(f"Position fetch failed: {e}")
             return []
+    
+    def get_holdings(self) -> List[Dict]:
+        """Get all holdings"""
+        try:
+            headers = {
+                'Authorization': f'token {self.api_key}:{self.access_token}'
+            }
+            
+            url = f"{self.base_url}/portfolio/holdings"
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            
+            return response.json()['data']
+            
+        except Exception as e:
+            logger.error(f"Holdings fetch failed: {e}")
+            return []
